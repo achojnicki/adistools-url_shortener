@@ -5,6 +5,7 @@ from flask import Flask, request, redirect
 from pymongo import MongoClient
 from pika import BlockingConnection, ConnectionParameters, PlainCredentials
 from uuid import uuid4
+from time import time
 
 application=Flask(__name__)
 config=adisconfig('/etc/adistools/url_shortener.yaml')
@@ -55,15 +56,19 @@ def redirect(redirection_query):
     data=urls.find_one(query)
 
     if data:
+        url_uuid=data['url_uuid']
         redirection_uuid=str(uuid4())
         user_agent=str(request.user_agent)
         ip_addr=str(request.remote_addr)
+        timestamp=time()
 
         document={
+            "url_uuid"          : url_uuid,
             "redirection_uuid"  : redirection_uuid,
             "redirection_query" : redirection_query,
             "ip_addr"           : ip_addr,
             "user_agent"        : user_agent,
+            "timestamp"         : timestamp,
             "host_details"      : None        
             }
 
