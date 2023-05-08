@@ -59,7 +59,10 @@ def redirect(redirection_query):
         url_uuid=data['url_uuid']
         redirection_uuid=str(uuid4())
         user_agent=str(request.user_agent)
-        ip_addr=str(request.remote_addr)
+        if request.headers.getlist("X-Forwarded-For"):
+            ip_addr= request.headers.getlist("X-Forwarded-For")[0]
+        else:
+            ip_addr=str(request.remote_addr)
         timestamp=time()
 
         document={
