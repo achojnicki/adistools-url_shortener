@@ -3,12 +3,11 @@ from adislog import adislog
 
 from flask import Flask, request, redirect
 from pymongo import MongoClient
-from pika import BlockingConnection, ConnectionParameters, PlainCredentials
 from uuid import uuid4
 from time import time
 
 application=Flask(__name__)
-config=adisconfig('/etc/adistools/url_shortener.yaml')
+config=adisconfig('/opt/adistools/configs/url_shortener.yaml')
 log=adislog(
     backends=['terminal'],
     debug=True,
@@ -21,32 +20,6 @@ mongo_cli=MongoClient(
 mongo_db=mongo_cli[config.mongo.db]
 urls=mongo_db['shortened_urls']
 metrics=mongo_db['shortened_urls_metrics']
-rabbitmq_connection=None
-
-def open_rabbitmq_conn():
-    rabbitmq_connection=BlockingConnection(
-        ConnectionParameters(
-            host=config.rabbitmq.host,
-            port=config.rabbitmq.port,
-            credentials=PlainCredentials(
-                config.rabbitmq.user,
-                config.rabbitmq.passwd
-                )
-            )
-        )
-
-def close_rabbitmq_conn():
-    rabbitmq_connection.close()
-    
-def send_to_queue(message):
-    open_rabbitmq_conn()
-    channel=rabbitmq_connection.channel()
-    channel.basic_publish(exchange="",
-                            routing_key="url_shortener", 
-                            body=message, 
-                            )
-    close_rabbitmq_conn()
-        
 
 @application.route("/<redirection_query>", methods=['GET'])
 def redirect(redirection_query):
@@ -72,7 +45,6 @@ def redirect(redirection_query):
             "ip_addr"           : ip_addr,
             "user_agent"        : user_agent,
             "timestamp"         : timestamp,
-            "host_details"      : None        
             }
 
         metrics.insert_one(document)
