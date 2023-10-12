@@ -9,10 +9,15 @@ from datetime import datetime
 application=Flask(__name__)
 config=adisconfig('/opt/adistools/configs/adistools-url_shortener.yaml')
 log=adislog(
-    backends=['terminal'],
+    project_name='adistools-url_shortener',
+    backends=['rabbitmq_emitter'],
     debug=True,
-    replace_except_hook=False,
-)
+    rabbitmq_host=config.rabbitmq.host,
+    rabbitmq_port=config.rabbitmq.port,
+    rabbitmq_user=config.rabbitmq.user,
+    rabbitmq_passwd=config.rabbitmq.password,
+    )
+
 mongo_cli=MongoClient(
     config.mongo.host,
     config.mongo.port,
@@ -35,7 +40,7 @@ def redirect(redirection_query):
         user_agent=str(request.user_agent)
 
         if request.headers.getlist("X-Forwarded-For"):
-            ip_addr= request.headers.getlist("X-Forwarded-For")[0]
+            ip_addr=request.headers.getlist("X-Forwarded-For")[0]
         else:
             ip_addr=str(request.remote_addr)
         
@@ -43,8 +48,11 @@ def redirect(redirection_query):
         document={
             "redirection_uuid"  : redirection_uuid,
             "redirection_query" : redirection_query,
-            "timestamp"         : time.timestamp(),
-            "strftime"          : time.strftime("%m/%d/%Y, %H:%M:%S"),
+            "time"              : {
+
+                "timestamp"         : time.timestamp(),
+                "strftime"          : time.strftime("%m/%d/%Y, %H:%M:%S")
+                },
             "client_details"    : {
                 "ip_addr"           : ip_addr,
                 "user_agent"        : user_agent,
