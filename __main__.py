@@ -1,66 +1,78 @@
 from adisconfig import adisconfig
-from adislog import adislog
+from log import Log
 
 from flask import Flask, request, redirect
 from pymongo import MongoClient
-
 from datetime import datetime
 
-application=Flask(__name__)
-config=adisconfig('/opt/adistools/configs/adistools-url_shortener.yaml')
-log=adislog(
-    project_name='adistools-url_shortener',
-    backends=['rabbitmq_emitter'],
-    debug=config.log.debug,
-    rabbitmq_host=config.rabbitmq.host,
-    rabbitmq_port=config.rabbitmq.port,
-    rabbitmq_user=config.rabbitmq.user,
-    rabbitmq_passwd=config.rabbitmq.password,
-    )
+class URL_Shortener:
+    project_name='adistools-url_shortener'
+    def __init__(self):
+        self._config=adisconfig('/opt/adistools/configs/adistools-url_shortener.yaml')
+        self._log=Log(
+            parent=self,
+            backends=['rabbitmq_emitter'],
+            debug=self._config.log.debug,
+            rabbitmq_host=self._config.rabbitmq.host,
+            rabbitmq_port=self._config.rabbitmq.port,
+            rabbitmq_user=self._config.rabbitmq.user,
+            rabbitmq_passwd=self._config.rabbitmq.password,
+        )  
 
-mongo_cli=MongoClient(
-    config.mongo.host,
-    config.mongo.port,
-)
-mongo_db=mongo_cli[config.mongo.db]
-urls=mongo_db['shortened_urls']
-metrics=mongo_db['shortened_urls_metrics']
+        self._mongo_cli=MongoClient(
+            self._config.mongo.host,
+            self._config.mongo.port,
+        )
 
-@application.route("/<redirection_query>", methods=['GET'])
-def redirect(redirection_query):
-    query={
-        'redirection_query' : redirection_query
-    }
-    data=urls.find_one(query)
+        self._mongo_db=self._mongo_cli[self._config.mongo.db]
+        self._urls=self._mongo_db['shortened_urls']
+        self._metrics=self._mongo_db['shortened_urls_metrics']
 
-    if data:
-        time=datetime.now()
-
-        redirection_uuid=data['redirection_uuid']
-        user_agent=str(request.user_agent)
-
-        if request.headers.getlist("X-Forwarded-For"):
-            ip_addr=request.headers.getlist("X-Forwarded-For")[0]
-        else:
-            ip_addr=str(request.remote_addr)
-        
-
+    def add_metric(self,redirection_uuid, redirection_query, remote_addr, user_agent, time):
         document={
             "redirection_uuid"  : redirection_uuid,
             "redirection_query" : redirection_query,
             "time"              : {
 
                 "timestamp"         : time.timestamp(),
-                "strftime"          : time.strftime("%m/%d/%Y, %H:%M:%S")
+                "strtime"          : time.strftime("%m/%d/%Y, %H:%M:%S")
                 },
             "client_details"    : {
-                "ip_addr"           : ip_addr,
+                "remote_addr"       : remote_addr,
                 "user_agent"        : user_agent,
                 }
             }
 
-        metrics.insert_one(document)
+        self._metrics.insert_one(document)
+    def get_short_url(self, redirection_query):
+        query={
+            'redirection_query' : redirection_query
+        }
+        return self._urls.find_one(query)
 
+url_shortener=URL_Shortener()
+application=Flask(__name__)
+
+@application.route("/<redirection_query>", methods=['GET'])
+def redirect(redirection_query):
+    
+    data=url_shortener.get_short_url(redirection_query)
+    if data:
+        time=datetime.now()
+        redirection_uuid=data['redirection_uuid']
+        user_agent=str(request.user_agent)
+        if request.headers.getlist("X-Forwarded-For"):
+            remote_addr=request.headers.getlist("X-Forwarded-For")[0]
+        else:
+            remote_addr=str(request.remote_addr)
+        
+        url_shortener.add_metric(
+            redirection_query=redirection_query,
+            redirection_uuid=redirection_uuid,
+            remote_addr=remote_addr,
+            user_agent=user_agent,
+            time=time
+            )
 
         return Flask.redirect(
             application,
