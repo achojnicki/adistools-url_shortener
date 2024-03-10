@@ -4,6 +4,7 @@ from log import Log
 from flask import Flask, request, redirect, render_template
 from pymongo import MongoClient
 from datetime import datetime
+from html import escape
 
 class URL_Shortener:
     project_name='adistools-url_shortener'
@@ -86,7 +87,7 @@ def redirect(redirection_query):
     else:
         return render_template(
             'not_found.html',
-            redirection_query=redirection_query)
+            redirection_query=escape(redirection_query))
 
 @application.route("/", methods=["GET"])
 def index():
