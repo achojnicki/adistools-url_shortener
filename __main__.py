@@ -84,7 +84,9 @@ def redirect(redirection_query):
             code=302
         )
     else:
-        return ""
+        return render_template(
+            'not_found.html',
+            redirection_query=redirection_query)
 
 @application.route("/", methods=["GET"])
 def index():
