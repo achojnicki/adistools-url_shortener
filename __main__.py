@@ -1,7 +1,7 @@
 from adisconfig import adisconfig
 from log import Log
 
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, render_template
 from pymongo import MongoClient
 from datetime import datetime
 
@@ -51,7 +51,11 @@ class URL_Shortener:
         return self._urls.find_one(query)
 
 url_shortener=URL_Shortener()
-application=Flask(__name__)
+application=Flask(
+    __name__,
+    template_folder="template",
+    static_folder='static'
+    )
 
 @application.route("/<redirection_query>", methods=['GET'])
 def redirect(redirection_query):
@@ -81,3 +85,7 @@ def redirect(redirection_query):
         )
     else:
         return ""
+
+@application.route("/", methods=["GET"])
+def index():
+    return render_template('index.html')
